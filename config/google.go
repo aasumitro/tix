@@ -20,3 +20,18 @@ func (cfg *Config) InitGoogleFormConn() {
 		log.Println("Google form service connection created . . . .")
 	})
 }
+
+// FormsServiceWrapper is a custom implementation of IFormsService that wraps *forms.FormsService.
+type FormsServiceWrapper struct {
+	Service *forms.FormsService
+}
+
+// Get implements the Get method of IFormsService.
+func (w *FormsServiceWrapper) Get(formID string) *forms.FormsGetCall {
+	return w.Service.Get(formID)
+}
+
+// Responses implements the Responses method of IFormsService.
+func (w *FormsServiceWrapper) Responses() *forms.FormsResponsesService {
+	return w.Service.Responses
+}

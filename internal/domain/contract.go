@@ -6,6 +6,7 @@ import (
 	"github.com/aasumitro/tix/internal/domain/entity"
 	"github.com/aasumitro/tix/internal/domain/request"
 	"github.com/aasumitro/tix/internal/domain/response"
+	"google.golang.org/api/forms/v1"
 )
 
 type (
@@ -22,6 +23,17 @@ type (
 			ctx context.Context,
 			uuid string,
 		) (resp *response.SupabaseRespond, err error)
+	}
+
+	IGoogleServiceRepository interface {
+		GetEvent(
+			ctx context.Context,
+			formID string,
+		) (*forms.Form, error)
+		GetResponses(
+			ctx context.Context,
+			formID string,
+		) (*forms.ListFormResponsesResponse, error)
 	}
 
 	IPostgreSQLRepository interface {

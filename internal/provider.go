@@ -69,8 +69,11 @@ func (boot *boostrap) newTixAPIProvider() {
 		config.Instance.SupabaseAPIKey,
 		config.Instance.SupabaseAPIKeyRoot)
 	tixRepository := sqlRepository.NewTixPostgreSQLRepository(boot.db)
+	gsRepository := restRepository.NewGoogleServiceRepository(&config.FormsServiceWrapper{
+		Service: boot.googleForm.Forms,
+	})
 	tixService := service.NewTixService(
-		service.WithGoogleFormService(boot.googleForm),
+		service.WithGoogleServiceRepository(gsRepository),
 		service.WithRedisCache(boot.cache),
 		service.WithAuthRESTRepository(authRepository),
 		service.WithPostgreSQLRepository(tixRepository),
