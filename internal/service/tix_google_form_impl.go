@@ -26,8 +26,7 @@ func (service *tixService) FetchForms(
 			return valueCache, nil
 		}
 
-		data, err := service.googleFormService.Forms.
-			Get(formID).Context(ctx).Do()
+		data, err := service.googleServiceRepository.GetEvent(ctx, formID)
 		if err != nil {
 			return nil, err
 		}
@@ -43,7 +42,7 @@ func (service *tixService) FetchForms(
 			service.redisCache.Set(ctx, cacheKey, jsonData, common.GoogleFormCacheTimeDuration)
 		}
 
-		return data, nil
+		return items, nil
 	}()
 	if err != nil {
 		return nil, err
@@ -73,8 +72,7 @@ func (service *tixService) FetchResponds(
 		return nil, err
 	}
 
-	data, err := service.googleFormService.Forms.Responses.
-		List(formID).Context(ctx).Do()
+	data, err := service.googleServiceRepository.GetResponses(ctx, formID)
 	if err != nil {
 		return nil, err
 	}

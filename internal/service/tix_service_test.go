@@ -16,6 +16,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
+	"google.golang.org/api/forms/v1"
 	"gopkg.in/gomail.v2"
 	"net/http"
 	"os"
@@ -242,14 +243,384 @@ func (s *tixServiceTestSuite) Test_DeleteUser_ShouldError() {
 }
 
 // TIX GOOGLE FORM IMPL
-func (s *tixServiceTestSuite) Test_FetchForms_ShouldSuccess() {}
-func (s *tixServiceTestSuite) Test_FetchForms_ShouldError()   {}
+func (s *tixServiceTestSuite) Test_FetchForms_ShouldSuccess() {
+	pqRepo := new(mocks.IPostgreSQLRepository)
+	gsRepo := new(mocks.IGoogleServiceRepository)
+	rc := redis.NewClient(&redis.Options{
+		Addr: miniredis.RunT(s.T()).Addr(),
+	})
+	svc := service.NewTixService(
+		service.WithPostgreSQLRepository(pqRepo),
+		service.WithGoogleServiceRepository(gsRepo),
+		service.WithRedisCache(rc))
+	s.T().Run("success fetch google repository", func(t *testing.T) {
+		gsRepo.On("GetEvent", mock.Anything, mock.Anything).Return(&forms.Form{
+			FormId: "asd",
+			Items: []*forms.Item{{
+				Title: "lorem",
+				QuestionItem: &forms.QuestionItem{
+					Question: &forms.Question{
+						QuestionId: "123",
+					},
+				},
+			}},
+		}, nil).Once()
+		items, err := svc.FetchForms(context.TODO(), "asd")
+		s.NotNil(items)
+		s.Nil(err)
+	})
+	s.T().Run("success fetch cache", func(t *testing.T) {
+		cacheKey := fmt.Sprintf("google-form-%s", "asd")
+		rc.Set(context.TODO(), cacheKey, `[{"id":"123","title":"asd"}]`, 1)
+		items, err := svc.FetchForms(context.TODO(), "asd")
+		s.NotNil(items)
+		s.Nil(err)
+		rc.Del(context.TODO(), cacheKey)
+	})
+}
+func (s *tixServiceTestSuite) Test_FetchForms_ShouldError() {
+	pqRepo := new(mocks.IPostgreSQLRepository)
+	gsRepo := new(mocks.IGoogleServiceRepository)
+	rc := redis.NewClient(&redis.Options{
+		Addr: miniredis.RunT(s.T()).Addr(),
+	})
+	svc := service.NewTixService(
+		service.WithPostgreSQLRepository(pqRepo),
+		service.WithGoogleServiceRepository(gsRepo),
+		service.WithRedisCache(rc))
+	s.T().Run("error from google repo", func(t *testing.T) {
+		gsRepo.On("GetEvent", mock.Anything, mock.Anything).Return(nil, errors.New("lorem")).Once()
+		items, err := svc.FetchForms(context.TODO(), "asd")
+		s.Nil(items)
+		s.NotNil(err)
+	})
+	s.T().Run("error marshal data", func(t *testing.T) {
+		cacheKey := fmt.Sprintf("google-form-%s", "asd")
+		rc.Set(context.TODO(), cacheKey, `{"asd":"123","qwe":"asd"}`, 1)
+		items, err := svc.FetchForms(context.TODO(), "asd")
+		s.Nil(items)
+		s.NotNil(err)
+		rc.Del(context.TODO(), cacheKey)
+	})
+}
 
-func (s *tixServiceTestSuite) Test_FetchResponds_ShouldSuccess() {}
-func (s *tixServiceTestSuite) Test_FetchResponds_ShouldError()   {}
+func (s *tixServiceTestSuite) Test_FetchResponds_ShouldSuccess() {
+	pqRepo := new(mocks.IPostgreSQLRepository)
+	gsRepo := new(mocks.IGoogleServiceRepository)
+	rc := redis.NewClient(&redis.Options{
+		Addr: miniredis.RunT(s.T()).Addr(),
+	})
+	svc := service.NewTixService(
+		service.WithPostgreSQLRepository(pqRepo),
+		service.WithGoogleServiceRepository(gsRepo),
+		service.WithRedisCache(rc))
+	gsRepo.On("GetEvent", mock.Anything, mock.Anything).Return(&forms.Form{
+		FormId: "asd",
+		Items: []*forms.Item{
+			{
+				Title: "pekerjaan",
+				QuestionItem: &forms.QuestionItem{
+					Question: &forms.Question{
+						QuestionId: "1",
+					},
+				},
+			},
+			{
+				Title: "tanggal_lahir",
+				QuestionItem: &forms.QuestionItem{
+					Question: &forms.Question{
+						QuestionId: "2",
+					},
+				},
+			},
+			{
+				Title: "email",
+				QuestionItem: &forms.QuestionItem{
+					Question: &forms.Question{
+						QuestionId: "3",
+					},
+				},
+			},
+			{
+				Title: "nama",
+				QuestionItem: &forms.QuestionItem{
+					Question: &forms.Question{
+						QuestionId: "4",
+					},
+				},
+			},
+			{
+				Title: "nomor_telepon",
+				QuestionItem: &forms.QuestionItem{
+					Question: &forms.Question{
+						QuestionId: "5",
+					},
+				},
+			},
+			{
+				Title: "bukti_transfer",
+				QuestionItem: &forms.QuestionItem{
+					Question: &forms.Question{
+						QuestionId: "6",
+					},
+				},
+			},
+		},
+	}, nil).Once()
+	gsRepo.On("GetResponses", mock.Anything, mock.Anything).Return(&forms.ListFormResponsesResponse{
+		Responses: []*forms.FormResponse{{
+			Answers: map[string]forms.Answer{
+				"pekerjaan": {
+					QuestionId: "1",
+					TextAnswers: &forms.TextAnswers{
+						Answers: []*forms.TextAnswer{
+							{
+								Value: "penagih hutang",
+							},
+						},
+					},
+				},
+				"tanggal_lahir": {
+					QuestionId: "2",
+					TextAnswers: &forms.TextAnswers{
+						Answers: []*forms.TextAnswer{
+							{
+								Value: "20230202",
+							},
+						},
+					},
+				},
+				"email": {
+					QuestionId: "3",
+					TextAnswers: &forms.TextAnswers{
+						Answers: []*forms.TextAnswer{
+							{
+								Value: "hello@hello.id",
+							},
+						},
+					},
+				},
+				"nama": {
+					QuestionId: "4",
+					TextAnswers: &forms.TextAnswers{
+						Answers: []*forms.TextAnswer{
+							{
+								Value: "hello",
+							},
+						},
+					},
+				},
+				"nomor_telepon": {
+					QuestionId: "5",
+					TextAnswers: &forms.TextAnswers{
+						Answers: []*forms.TextAnswer{
+							{
+								Value: "080888982828",
+							},
+						},
+					},
+				},
+				"bukti_transfer": {
+					QuestionId: "6",
+					FileUploadAnswers: &forms.FileUploadAnswers{
+						Answers: []*forms.FileUploadAnswer{
+							{
+								FileId: "080888982828",
+							},
+						},
+					},
+				},
+			},
+		}},
+	}, nil).Once()
+	items, err := svc.FetchResponds(context.TODO(), "asd")
+	s.NotNil(items)
+	s.Nil(err)
+}
+func (s *tixServiceTestSuite) Test_FetchResponds_ShouldError() {
+	pqRepo := new(mocks.IPostgreSQLRepository)
+	gsRepo := new(mocks.IGoogleServiceRepository)
+	rc := redis.NewClient(&redis.Options{
+		Addr: miniredis.RunT(s.T()).Addr(),
+	})
+	svc := service.NewTixService(
+		service.WithPostgreSQLRepository(pqRepo),
+		service.WithGoogleServiceRepository(gsRepo),
+		service.WithRedisCache(rc))
+	gsRepo.On("GetEvent", mock.Anything, mock.Anything).Return(&forms.Form{
+		FormId: "asd",
+		Items: []*forms.Item{{
+			Title: "lorem",
+			QuestionItem: &forms.QuestionItem{
+				Question: &forms.Question{
+					QuestionId: "123",
+				},
+			},
+		}},
+	}, nil).Once()
+	gsRepo.On("GetResponses", mock.Anything, mock.Anything).Return(nil, errors.New("lorem")).Once()
+	items, err := svc.FetchResponds(context.TODO(), "asd")
+	s.Nil(items)
+	s.NotNil(err)
+}
 
-func (s *tixServiceTestSuite) Test_SyncRespondData_ShouldSuccess() {}
-func (s *tixServiceTestSuite) Test_SyncRespondData_ShouldError()   {}
+func (s *tixServiceTestSuite) Test_SyncRespondData_ShouldSuccess() {
+	pqRepo := new(mocks.IPostgreSQLRepository)
+	gsRepo := new(mocks.IGoogleServiceRepository)
+	rc := redis.NewClient(&redis.Options{
+		Addr: miniredis.RunT(s.T()).Addr(),
+	})
+	svc := service.NewTixService(
+		service.WithPostgreSQLRepository(pqRepo),
+		service.WithGoogleServiceRepository(gsRepo),
+		service.WithRedisCache(rc))
+	pqRepo.On("GetEventByGoogleFormID", mock.Anything, mock.Anything).Return(&entity.Event{ID: 1}, nil).Once()
+	pqRepo.On("GetParticipantByEmailAndEventID", mock.Anything, mock.Anything, mock.Anything).Return(nil, sql.ErrNoRows).Once()
+	gsRepo.On("GetEvent", mock.Anything, mock.Anything).Return(&forms.Form{
+		FormId: "asd",
+		Items: []*forms.Item{
+			{
+				Title: "pekerjaan",
+				QuestionItem: &forms.QuestionItem{
+					Question: &forms.Question{
+						QuestionId: "1",
+					},
+				},
+			},
+			{
+				Title: "tanggal_lahir",
+				QuestionItem: &forms.QuestionItem{
+					Question: &forms.Question{
+						QuestionId: "2",
+					},
+				},
+			},
+			{
+				Title: "email",
+				QuestionItem: &forms.QuestionItem{
+					Question: &forms.Question{
+						QuestionId: "3",
+					},
+				},
+			},
+			{
+				Title: "nama",
+				QuestionItem: &forms.QuestionItem{
+					Question: &forms.Question{
+						QuestionId: "4",
+					},
+				},
+			},
+			{
+				Title: "nomor_telepon",
+				QuestionItem: &forms.QuestionItem{
+					Question: &forms.Question{
+						QuestionId: "5",
+					},
+				},
+			},
+			{
+				Title: "bukti_transfer",
+				QuestionItem: &forms.QuestionItem{
+					Question: &forms.Question{
+						QuestionId: "6",
+					},
+				},
+			},
+		},
+	}, nil).Once()
+	gsRepo.On("GetResponses", mock.Anything, mock.Anything).Return(&forms.ListFormResponsesResponse{
+		Responses: []*forms.FormResponse{{
+			Answers: map[string]forms.Answer{
+				"pekerjaan": {
+					QuestionId: "1",
+					TextAnswers: &forms.TextAnswers{
+						Answers: []*forms.TextAnswer{
+							{
+								Value: "penagih hutang",
+							},
+						},
+					},
+				},
+				"tanggal_lahir": {
+					QuestionId: "2",
+					TextAnswers: &forms.TextAnswers{
+						Answers: []*forms.TextAnswer{
+							{
+								Value: "20230202",
+							},
+						},
+					},
+				},
+				"email": {
+					QuestionId: "3",
+					TextAnswers: &forms.TextAnswers{
+						Answers: []*forms.TextAnswer{
+							{
+								Value: "hello@hello.id",
+							},
+						},
+					},
+				},
+				"nama": {
+					QuestionId: "4",
+					TextAnswers: &forms.TextAnswers{
+						Answers: []*forms.TextAnswer{
+							{
+								Value: "hello",
+							},
+						},
+					},
+				},
+				"nomor_telepon": {
+					QuestionId: "5",
+					TextAnswers: &forms.TextAnswers{
+						Answers: []*forms.TextAnswer{
+							{
+								Value: "080888982828",
+							},
+						},
+					},
+				},
+				"bukti_transfer": {
+					QuestionId: "6",
+					FileUploadAnswers: &forms.FileUploadAnswers{
+						Answers: []*forms.FileUploadAnswer{
+							{
+								FileId: "080888982828",
+							},
+						},
+					},
+				},
+			},
+		}},
+	}, nil).Once()
+	pqRepo.On("InsertManyParticipants", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+	err := svc.SyncRespondData(context.TODO(), "asd")
+	s.Nil(err)
+}
+func (s *tixServiceTestSuite) Test_SyncRespondData_ShouldError() {
+	pqRepo := new(mocks.IPostgreSQLRepository)
+	gsRepo := new(mocks.IGoogleServiceRepository)
+	rc := redis.NewClient(&redis.Options{
+		Addr: miniredis.RunT(s.T()).Addr(),
+	})
+	svc := service.NewTixService(
+		service.WithPostgreSQLRepository(pqRepo),
+		service.WithGoogleServiceRepository(gsRepo),
+		service.WithRedisCache(rc))
+	s.T().Run("error get event", func(t *testing.T) {
+		pqRepo.On("GetEventByGoogleFormID", mock.Anything, mock.Anything).Return(nil, errors.New("lorem")).Once()
+		err := svc.SyncRespondData(context.TODO(), "asd")
+		s.NotNil(err)
+	})
+	s.T().Run("error get responds", func(t *testing.T) {
+		pqRepo.On("GetEventByGoogleFormID", mock.Anything, mock.Anything).Return(&entity.Event{ID: 1}, nil).Once()
+		gsRepo.On("GetEvent", mock.Anything, mock.Anything).Return(nil, errors.New("lorem")).Once()
+		err := svc.SyncRespondData(context.TODO(), "asd")
+		s.NotNil(err)
+	})
+}
 
 // TIX EXPORT IMPL
 func (s *tixServiceTestSuite) Test_ExportEvent_ShouldSuccess() {
